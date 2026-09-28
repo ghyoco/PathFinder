@@ -1,6 +1,6 @@
 <h1 align="center">🛣️ PathFinder</h1>
 <p align="center">
-  <strong>Real-Time Lane Detection & Drift Alert System</strong><br/>
+  <strong>Real-Time Lane Detection &amp; Drift Alert System</strong><br/>
   Bird's-Eye View · Polynomial Curve Fitting · Day/Night Adaptive · Live Web App
 </p>
 
@@ -22,7 +22,7 @@
 
 | Feature | Details |
 |---|---|
-| **Lane Tracking** | Detects both straight and curved lanes via 2nd-degree polynomial fitting ($x = ay^2 + by + c$) |
+| **Lane Tracking** | Detects both straight and curved lanes via 2nd-degree polynomial fitting (`x = a*y^2 + b*y + c`) |
 | **Drift Alert** | Fires `DRIFT LEFT / RIGHT` when vehicle deviates > 8% of frame width from lane center |
 | **Day / Night Mode** | Adaptive CLAHE, gamma correction, and HLS thresholds (auto-detected or manual) |
 | **Web Interface** | Clean drag-and-drop video upload with side-by-side before/after comparison playback |
@@ -76,7 +76,7 @@ PathFinder/
        ├─► 2. Edge Extraction (Adaptive Canny & Trapezoidal ROI Masking)
        ├─► 3. Bird's-Eye View (BEV) Homography Warp
        ├─► 4. Sliding-Window Pixel Clustering (20 vertical windows)
-       ├─► 5. 2nd-Degree Polynomial Fit (x = ay² + by + c)
+       ├─► 5. 2nd-Degree Polynomial Fit (x = a*y^2 + b*y + c)
        ├─► 6. Exponential Moving Average (EMA) Coefficient Smoothing
        ├─► 7. Drift Measurement & HUD Warning Generation
        ├─► 8. Inverse Perspective Unwarp & Lane Overlay Blending
@@ -93,42 +93,53 @@ PathFinder/
 ## 🔬 Pipeline Deep-Dive
 
 ### 1. Adaptive Preprocessing
-- **Gamma Correction**: Brightens dark/night frames before contrast equalization ($\gamma = 0.5$ at night, $1.0$ for day).
+- **Gamma Correction**: Brightens dark/night frames before contrast equalization (gamma = 0.5 at night, 1.0 for day).
 - **CLAHE (Contrast Limited Adaptive Histogram Equalization)**: Lifts faint lane markings under glare or pitch-black night conditions (`clipLimit=2.0` day, `4.5` night).
 - **Bilateral Filtering**: Smooths high-frequency asphalt noise while preserving sharp line edges.
-- **HLS Color Thresholding**: Isolates white lines ($L \ge 190$ day, $110$ night) and yellow lines ($H \in [10, 45]$, $S \ge 100$).
+- **HLS Color Thresholding**: Isolates white lines (L >= 190 day, 110 night) and yellow lines (H in range 10–45, S >= 100).
 - **Morphological Dilation**: Connects fragmented dashed lane markings.
 
 ### 2. Edge Detection & ROI
-- **Adaptive Canny**: Upper and lower gradient thresholds dynamically calculated from frame median intensity $\tilde{v}$:
-  $$\text{threshold}_{\text{low}} = (1 - \sigma)\tilde{v}, \quad \text{threshold}_{\text{high}} = (1 + \sigma)\tilde{v}$$
+- **Adaptive Canny**: Upper and lower gradient thresholds are dynamically calculated from the frame's median pixel intensity `v`:
+  - Lower threshold: `threshold_low  = (1 - sigma) * v`
+  - Upper threshold: `threshold_high = (1 + sigma) * v`
 - **Trapezoidal ROI Mask**: Clamps processing to the drivable horizon to avoid trees, signs, and sky.
 
-### 3. Bird’s-Eye View (BEV) Perspective Warping
-A perspective matrix $M$ projects the camera view into a top-down orthogonal road plane:
-- Converts converging perspective lines into parallel lines.
+### 3. Bird's-Eye View (BEV) Perspective Warping
+A perspective transformation matrix projects the camera view into a top-down orthogonal road plane:
+- Converts converging perspective lane lines into parallel lines.
 - Widened top corners (`ROI_TOP_LEFT = (0.40, 0.46)`, `ROI_TOP_RIGHT = (0.62, 0.46)`) capture curved paths exiting the horizon.
 
 ### 4. Sliding-Window Clustering (20 Windows)
-- Bins edge pixels into vertical slices ($N = 20$).
-- If window pixel density $\ge 20$, the subsequent window shifts its center to $\text{mean}(x)$ of the cluster.
-- **Pinch Guard**: Protects against false histogram merges when curves bring lanes visually closer in BEV.
+- Bins edge pixels into 20 vertical slices across the frame height.
+- If a window contains 20 or more active pixels, the next window re-centers on the mean x-position of the cluster.
+- **Pinch Guard**: Prevents false histogram merges when sharp curves bring lane boundaries visually close together in BEV.
 
 ### 5. 2nd-Degree Polynomial Fit & Smoothing
-Lanes are modeled mathematically as quadratic curves:
-$$x(y) = a y^2 + b y + c$$
-- **Curvature Coefficient ($a$)**: Quantifies turn intensity ($a > 0$ curves right, $a < 0$ curves left). Physical limit filter ($|a| \le 0.005$) drops implausible fits.
-- **Exponential Moving Average (EMA)**:
-  $$\text{coeffs}_t = \alpha \cdot \text{coeffs}_{\text{cur}} + (1 - \alpha) \cdot \text{coeffs}_{t-1}$$
-  Filters out instantaneous frame dropouts and camera vibration.
+Lanes are modeled as quadratic curves:
+
+```
+x = a * y^2 + b * y + c
+```
+
+- **Curvature Coefficient `a`**: Quantifies turn intensity. `a > 0` curves right, `a < 0` curves left. A physical sanity filter (`|a| <= 0.005`) discards implausible fits.
+- **Exponential Moving Average (EMA)**: Smooths polynomial coefficients across frames to eliminate jitter from camera vibration or dropped frames:
+
+```
+coeffs[t] = alpha * coeffs_current + (1 - alpha) * coeffs_previous
+```
 
 ### 6. Vehicle Drift Telemetry
-- Assumes centered camera mount: $\text{car}_{\text{center}} = \frac{w}{2}$.
-- Computes lane center at vehicle bumper level ($y_{\text{eval}} = h - 1$):
-  $$\text{lane}_{\text{center}} = \frac{x_{\text{left}}(y_{\text{eval}}) + x_{\text{right}}(y_{\text{eval}})}{2}$$
-- **Offset ($\text{off}$)** $= \text{car}_{\text{center}} - \text{lane}_{\text{center}}$:
-  - If $|\text{off}| > 0.08 \times w$: Triggers **`DRIFT RIGHT!`** ($\text{off} > 0$) or **`DRIFT LEFT!`** ($\text{off} < 0$) in red.
-  - Otherwise: Displays **`On Lane`** in green.
+- **Car center**: Assumes the camera is mounted along the vehicle centerline, so `car_center = frame_width / 2`.
+- **Lane center**: Evaluated at the bottom bumper row (`y = frame_height - 1`):
+
+```
+lane_center = (x_left + x_right) / 2
+```
+
+- **Drift offset**: `offset = car_center - lane_center`
+  - If `|offset| > 0.08 * frame_width`: triggers **`DRIFT RIGHT!`** (offset > 0) or **`DRIFT LEFT!`** (offset < 0) displayed in red.
+  - Otherwise: displays **`On Lane`** in green.
 
 ---
 
@@ -204,5 +215,3 @@ docker run -p 7860:7860 pathfinder:latest
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
-
-
