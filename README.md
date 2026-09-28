@@ -9,7 +9,9 @@
   <img src="https://img.shields.io/badge/OpenCV-4.x-5C3EE8?style=flat&logo=opencv&logoColor=white"/>
   <img src="https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat&logo=fastapi&logoColor=white"/>
   <img src="https://img.shields.io/badge/Docker-ready-2496ED?style=flat&logo=docker&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Deployed-HuggingFace%20Spaces-FFD21E?style=flat&logo=huggingface&logoColor=black"/>
+  <img src="https://img.shields.io/badge/Frontend-Vercel-000000?style=flat&logo=vercel&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Backend-HuggingFace%20Spaces-FFD21E?style=flat&logo=huggingface&logoColor=black"/>
+  <img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=flat"/>
 </p>
 
 ---
@@ -24,7 +26,7 @@
 | **Drift Alert** | Fires `DRIFT LEFT / RIGHT` when vehicle deviates > 8% of frame width from lane center |
 | **Day / Night Mode** | Adaptive CLAHE, gamma correction, and HLS thresholds (auto-detected or manual) |
 | **Web Interface** | Clean drag-and-drop video upload with side-by-side before/after comparison playback |
-| **Live Deployment** | Packaged with Docker and deployed on Hugging Face Spaces (`ghyoco-lane-detection.hf.space`) |
+| **Live Deployment** | Frontend deployed on **Vercel** (`lane-detection-cv.vercel.app`), backend on **Hugging Face Spaces** (`ghyoco-lane-detection.hf.space`) |
 
 ---
 
@@ -121,10 +123,10 @@ $$x(y) = a y^2 + b y + c$$
   Filters out instantaneous frame dropouts and camera vibration.
 
 ### 6. Vehicle Drift Telemetry
-- Assumes centered camera mount: $\text{car\_center} = \frac{w}{2}$.
+- Assumes centered camera mount: $\text{car}_{\text{center}} = \frac{w}{2}$.
 - Computes lane center at vehicle bumper level ($y_{\text{eval}} = h - 1$):
-  $$\text{lane\_center} = \frac{x_{\text{left}}(y_{\text{eval}}) + x_{\text{right}}(y_{\text{eval}})}{2}$$
-- **Offset ($\text{off}$)** $= \text{car\_center} - \text{lane\_center}$:
+  $$\text{lane}_{\text{center}} = \frac{x_{\text{left}}(y_{\text{eval}}) + x_{\text{right}}(y_{\text{eval}})}{2}$$
+- **Offset ($\text{off}$)** $= \text{car}_{\text{center}} - \text{lane}_{\text{center}}$:
   - If $|\text{off}| > 0.08 \times w$: Triggers **`DRIFT RIGHT!`** ($\text{off} > 0$) or **`DRIFT LEFT!`** ($\text{off} < 0$) in red.
   - Otherwise: Displays **`On Lane`** in green.
 
@@ -195,7 +197,12 @@ docker run -p 7860:7860 pathfinder:latest
 - **Backend Framework**: FastAPI, Uvicorn, Pydantic
 - **Video Encoding**: FFmpeg, imageio-ffmpeg (H.264 / AAC)
 - **Frontend**: Vanilla JavaScript (ES6+), HTML5 Video API, CSS3 Flexbox/Grid
-- **DevOps & Cloud**: Docker, Hugging Face Spaces
+- **DevOps & Cloud**: Docker, Hugging Face Spaces (Backend), Vercel (Frontend)
 
 ---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
+
 
